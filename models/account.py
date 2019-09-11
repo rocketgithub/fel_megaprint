@@ -57,7 +57,7 @@ class AccountInvoice(models.Model):
                 DTE = etree.SubElement(SAT, DTE_NS+"DTE", ID="DatosCertificados")
                 DatosEmision = etree.SubElement(DTE, DTE_NS+"DatosEmision", ID="DatosEmision")
                 # Esto es solo para xmlsig no truene, despues lo borramos ¯\_(ツ)_/¯
-                SingatureTemp = etree.SubElement(DatosEmision, DS_NS+"Signature")
+#                SingatureTemp = etree.SubElement(DatosEmision, DS_NS+"Signature")
 
                 DatosGenerales = etree.SubElement(DatosEmision, DTE_NS+"DatosGenerales", CodigoMoneda="GTQ", FechaHoraEmision=fields.Datetime.context_timestamp(factura, datetime.now()).strftime('%Y-%m-%dT%H:%M:%S'), Tipo=factura.journal_id.tipo_documento_fel)
 
@@ -173,7 +173,6 @@ class AccountInvoice(models.Model):
                     MontoAbono.text = '{:.2f}'.format(factura.currency_id.round(gran_total))
 
                 xmls = etree.tostring(GTDocumento, encoding="UTF-8")
-                logging.warn(xmls)
 
                 signature = xmlsig.template.create(
                     xmlsig.constants.TransformInclC14N,
@@ -181,15 +180,14 @@ class AccountInvoice(models.Model):
                     "Signature"
                 )
                 signature_id = utils.get_unique_id()
-                logging.warn(DatosEmision.get("ID"))
                 ref_datos = xmlsig.template.add_reference(
                     signature, xmlsig.constants.TransformSha256, uri="#DatosEmision"
                 )
-                xmlsig.template.add_transform(ref_datos, xmlsig.constants.TransformEnveloped)
+#                xmlsig.template.add_transform(ref_datos, xmlsig.constants.TransformEnveloped)
                 ref_prop = xmlsig.template.add_reference(
                     signature, xmlsig.constants.TransformSha256, uri_type="http://uri.etsi.org/01903#SignedProperties", uri="#" + signature_id
                 )
-                xmlsig.template.add_transform(ref_prop, xmlsig.constants.TransformInclC14N)
+#                xmlsig.template.add_transform(ref_prop, xmlsig.constants.TransformInclC14N)
                 ki = xmlsig.template.ensure_key_info(signature)
                 data = xmlsig.template.add_x509_data(ki)
                 xmlsig.template.x509_data_add_certificate(data)
@@ -205,19 +203,19 @@ class AccountInvoice(models.Model):
                     qualifying, name=signature_id, datetime=datetime.now()-timedelta(seconds=120)
 #                    qualifying, name=signature_id, datetime=datetime.now()-timedelta(days=2)
                 )
-                logging.warn(signature)
-                signature.remove
-                logging.warn(GTDocumento)
+
+#                policy = props.find("{http://uri.etsi.org/01903/v1.3.2#}SignedSignatureProperties").find("{http://uri.etsi.org/01903/v1.3.2#}SignaturePolicyIdentifier")
+#                policy.getparent().remove(policy)
                 GTDocumento.append(signature)
                 ctx = XAdESContext(ImpliedPolicy(xmlsig.constants.TransformSha256))
                 with open(path.join("/home/odoo/leplan", "51043491-6747a80bb6a554ae_unprotected.pfx"), "rb") as key_file:
                     ctx.load_pkcs12(crypto.load_pkcs12(key_file.read()))
                 ctx.sign(signature)
-                DatosEmision.remove(SingatureTemp)
+                logging.warn(ctx.verify(signature))
+#                DatosEmision.remove(SingatureTemp)
 
                 xmls = etree.tostring(GTDocumento, encoding="UTF-8")
-                logging.warn(xmls)
-                
+
                 signed_text = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.encode("utf-8")+xmls
                 logging.warn(signed_text)
 
@@ -229,7 +227,6 @@ class AccountInvoice(models.Model):
                 
                 if len(resultadoXML.xpath("//token")) > 0:
                     token = resultadoXML.xpath("//token")[0].text
-                    logging.warn(token)
 
                     headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                     data = '<?xml version="1.0" encoding="UTF-8"?><RegistraDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></RegistraDocumentoXMLRequest>'.format('5F5F1540-C059-11E9-BB97-0800200C9A66', signed_text.decode("utf-8").replace("\n", ""))
