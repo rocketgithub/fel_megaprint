@@ -16,7 +16,8 @@
                                 <field name="numero_fel"/>
                             </group>
                             <group>
-                                <field name="pdf_fel" widget="url"/>
+                                <field name="name_pdf_fel" invisible="1"/>
+                                <field name="pdf_fel" filename="name_pdf_fel"/>
                                 <field name="factura_original_id"/>
                             </group>
                         </group>
@@ -48,11 +49,12 @@
             <field name="arch" type="xml">
                 <data>
                     <notebook position="inside">
-                        <page string="FEL megaprint">
+                        <page string="FEL Megaprint">
                             <group string="megaprint">
                                 <group>
                                     <field name="frases_fel"/>
                                     <field name="adenda_fel"/>
+                                    <field name="pruebas_fel"/>
                                 </group>
                             </group>
                         </page>
