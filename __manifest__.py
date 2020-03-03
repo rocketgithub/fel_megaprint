@@ -10,6 +10,7 @@
     'depends': ['account'],
     'data': [
         'views/account_view.xml',
+        'views/partner_view.xml',
     ],
     'demo': [],
     'installable': True
