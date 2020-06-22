@@ -4,41 +4,44 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.float_utils import float_round
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import base64
-from os import path
-
-from OpenSSL import crypto
 from lxml import etree
 import requests
-import xmlsig
-from xades import XAdESContext, template, utils, ObjectIdentifier
-from xades.policy import GenericPolicyId, ImpliedPolicy
+
+#from OpenSSL import crypto
+#import xmlsig
+#from xades import XAdESContext, template, utils, ObjectIdentifier
+#from xades.policy import GenericPolicyId, ImpliedPolicy
 import html
 import uuid
 
 import logging
 
-class AccountInvoice(models.Model):
-    _inherit = "account.invoice"
+class AccountMove(models.Model):
+    _inherit = "account.move"
 
     firma_fel = fields.Char('Firma FEL', copy=False)
     serie_fel = fields.Char('Serie FEL', copy=False)
     numero_fel = fields.Char('Numero FEL', copy=False)
+    factura_original_id = fields.Many2one('account.invoice', string="Factura original FEL")
+    consignatario_fel = fields.Many2one('res.partner', string="Consignatario o Destinatario FEL")
+    comprador_fel = fields.Many2one('res.partner', string="Comprador FEL")
+    exportador_fel = fields.Many2one('res.partner', string="Exportador FEL")
+    incoterm_fel = fields.Char(string="Incoterm FEL")
     pdf_fel = fields.Binary('PDF FEL', copy=False)
     name_pdf_fel = fields.Char('Nombre archivo PDF FEL', default='fel.pdf', size=32)
-    factura_original_id = fields.Many2one('account.invoice', string="Factura original FEL")
 
-    def invoice_validate(self):
+    def post(self):
         detalles = []
         subtotal = 0
         for factura in self:
-            if factura.journal_id.usuario_fel and not factura.firma_fel:
+            if factura.type in ['out_invoice', 'out_refund', 'in_invoice'] and factura.journal_id.generar_fel and not factura.firma_fel and factura.amount_total != 0:
                 attr_qname = etree.QName("http://www.w3.org/2001/XMLSchema-instance", "schemaLocation")
 
                 NSMAP = {
                     "ds": "http://www.w3.org/2000/09/xmldsig#",
-                    "dte": "http://www.sat.gob.gt/dte/fel/0.1.0",
+                    "dte": "http://www.sat.gob.gt/dte/fel/0.2.0",
                 }
 
                 NSMAP_REF = {
@@ -57,15 +60,15 @@ class AccountInvoice(models.Model):
                     "cfe": "http://www.sat.gob.gt/face2/ComplementoFacturaEspecial/0.1.0",
                 }
 
-                DTE_NS = "{http://www.sat.gob.gt/dte/fel/0.1.0}"
+                DTE_NS = "{http://www.sat.gob.gt/dte/fel/0.2.0}"
                 DS_NS = "{http://www.w3.org/2000/09/xmldsig#}"
                 CNO_NS = "{http://www.sat.gob.gt/face2/ComplementoReferenciaNota/0.1.0}"
                 CFE_NS = "{http://www.sat.gob.gt/face2/ComplementoFacturaEspecial/0.1.0}"
                 CEX_NS = "{http://www.sat.gob.gt/face2/ComplementoExportaciones/0.1.0}"
                 CFC_NS = "{http://www.sat.gob.gt/dte/fel/CompCambiaria/0.1.0}"
 
-                # GTDocumento = etree.Element(DTE_NS+"GTDocumento", {attr_qname: "http://www.sat.gob.gt/dte/fel/0.1.0"}, Version="0.4", nsmap=NSMAP)
-                GTDocumento = etree.Element(DTE_NS+"GTDocumento", {}, Version="0.4", nsmap=NSMAP)
+                # GTDocumento = etree.Element(DTE_NS+"GTDocumento", {attr_qname: "http://www.sat.gob.gt/dte/fel/0.2.0"}, Version="0.4", nsmap=NSMAP)
+                GTDocumento = etree.Element(DTE_NS+"GTDocumento", {}, Version="0.1", nsmap=NSMAP)
                 SAT = etree.SubElement(GTDocumento, DTE_NS+"SAT", ClaseDocumento="dte")
                 DTE = etree.SubElement(SAT, DTE_NS+"DTE", ID="DatosCertificados")
                 DatosEmision = etree.SubElement(DTE, DTE_NS+"DatosEmision", ID="DatosEmision")
@@ -78,14 +81,14 @@ class AccountInvoice(models.Model):
                 if factura.currency_id.id != factura.company_id.currency_id.id:
                     moneda = "USD"
 
-                fecha = fields.Date.from_string(factura.date_invoice).strftime('%Y-%m-%d')
+                fecha = factura.invoice_date.strftime('%Y-%m-%d')
                 hora = fields.Datetime.context_timestamp(factura, timestamp=datetime.now()).strftime('%H:%M:%S')
                 fecha_hora = fecha+'T'+hora
                 DatosGenerales = etree.SubElement(DatosEmision, DTE_NS+"DatosGenerales", CodigoMoneda=moneda, FechaHoraEmision=fecha_hora, Tipo=tipo_documento_fel)
                 if factura.tipo_gasto == 'importacion':
                     DatosGenerales.attrib['Exp'] = "SI"
 
-                Emisor = etree.SubElement(DatosEmision, DTE_NS+"Emisor", AfiliacionIVA="GEN", CodigoEstablecimiento=factura.journal_id.codigo_establecimiento_fel, CorreoEmisor="", NITEmisor=factura.company_id.vat.replace('-',''), NombreComercial=factura.journal_id.direccion.name, NombreEmisor=factura.company_id.name)
+                Emisor = etree.SubElement(DatosEmision, DTE_NS+"Emisor", AfiliacionIVA="GEN", CodigoEstablecimiento=str(factura.journal_id.codigo_establecimiento), CorreoEmisor="", NITEmisor=factura.company_id.vat.replace('-',''), NombreComercial=factura.journal_id.direccion.name, NombreEmisor=factura.company_id.name)
                 DireccionEmisor = etree.SubElement(Emisor, DTE_NS+"DireccionEmisor")
                 Direccion = etree.SubElement(DireccionEmisor, DTE_NS+"Direccion")
                 Direccion.text = factura.journal_id.direccion.street or 'Ciudad'
@@ -154,7 +157,7 @@ class AccountInvoice(models.Model):
                     total_linea = precio_unitario * linea.quantity
                     total_linea_base = precio_unitario_base * linea.quantity
                     total_impuestos = total_linea - total_linea_base
-                    cantidad_impuestos += len(linea.invoice_line_tax_ids)
+                    cantidad_impuestos += len(linea.tax_ids)
 
                     Item = etree.SubElement(Items, DTE_NS+"Item", BienOServicio=tipo_producto, NumeroLinea=str(linea_num))
                     Cantidad = etree.SubElement(Item, DTE_NS+"Cantidad")
@@ -169,7 +172,7 @@ class AccountInvoice(models.Model):
                     Precio.text = '{:.6f}'.format(precio_sin_descuento * linea.quantity)
                     Descuento = etree.SubElement(Item, DTE_NS+"Descuento")
                     Descuento.text = '{:.6f}'.format(descuento)
-                    if len(linea.invoice_line_tax_ids) > 0:
+                    if len(linea.tax_ids) > 0:
                         Impuestos = etree.SubElement(Item, DTE_NS+"Impuestos")
                         Impuesto = etree.SubElement(Impuestos, DTE_NS+"Impuesto")
                         NombreCorto = etree.SubElement(Impuesto, DTE_NS+"NombreCorto")
@@ -200,67 +203,65 @@ class AccountInvoice(models.Model):
                     Adenda = etree.SubElement(SAT, DTE_NS+"Adenda")
                     exec(factura.company_id.adenda_fel, {'etree': etree, 'Adenda': Adenda, 'factura': factura})
 
-                if tipo_documento_fel in ['NDEB', 'NCRE']:
-                    Complementos = etree.SubElement(DatosEmision, DTE_NS+"Complementos")
-                    Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="ReferenciasNota", NombreComplemento="Nota de Credito" if tipo_documento_fel == 'NCRE' else "Nota de Debito", URIComplemento="text")
-                    if factura.factura_original_id.numero_fel:
-                        ReferenciasNota = etree.SubElement(Complemento, CNO_NS+"ReferenciasNota", FechaEmisionDocumentoOrigen=str(factura.factura_original_id.date_invoice), MotivoAjuste="-", NumeroAutorizacionDocumentoOrigen=factura.factura_original_id.firma_fel, NumeroDocumentoOrigen=factura.factura_original_id.numero_fel, SerieDocumentoOrigen=factura.factura_original_id.serie_fel, Version="0.0", nsmap=NSMAP_REF)
-                    else:
-                        ReferenciasNota = etree.SubElement(Complemento, CNO_NS+"ReferenciasNota", RegimenAntiguo="Antiguo", FechaEmisionDocumentoOrigen=str(factura.factura_original_id.date_invoice), MotivoAjuste="-", NumeroAutorizacionDocumentoOrigen=factura.factura_original_id.firma_fel, NumeroDocumentoOrigen=factura.factura_original_id.name.split("-")[1], SerieDocumentoOrigen=factura.factura_original_id.name.split("-")[0], Version="0.0", nsmap=NSMAP_REF)
-
-                if tipo_documento_fel in ['FCAM']:
+                # En todos estos casos, es necesario enviar complementos
+                if tipo_documento_fel in ['NDEB', 'NCRE'] or tipo_documento_fel in ['FCAM'] or (tipo_documento_fel in ['FACT', 'FCAM'] and factura.tipo_gasto == 'importacion') or tipo_documento_fel in ['FESP']:
                     Complementos = etree.SubElement(DatosEmision, DTE_NS+"Complementos")
 
-                    Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="FCAM", NombreComplemento="AbonosFacturaCambiaria", URIComplemento="#AbonosFacturaCambiaria")
-                    AbonosFacturaCambiaria = etree.SubElement(Complemento, CFC_NS+"AbonosFacturaCambiaria", Version="1", nsmap=NSMAP_ABONO)
-                    Abono = etree.SubElement(AbonosFacturaCambiaria, CFC_NS+"Abono")
-                    NumeroAbono = etree.SubElement(Abono, CFC_NS+"NumeroAbono")
-                    NumeroAbono.text = "1"
-                    FechaVencimiento = etree.SubElement(Abono, CFC_NS+"FechaVencimiento")
-                    FechaVencimiento.text = str(factura.date_due)
-                    MontoAbono = etree.SubElement(Abono, CFC_NS+"MontoAbono")
-                    MontoAbono.text = '{:.2f}'.format(factura.currency_id.round(gran_total))
+                    if tipo_documento_fel in ['NDEB', 'NCRE']:
+                        Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="ReferenciasNota", NombreComplemento="Nota de Credito" if tipo_documento_fel == 'NCRE' else "Nota de Debito", URIComplemento="text")
+                        if factura.factura_original_id.numero_fel:
+                            ReferenciasNota = etree.SubElement(Complemento, CNO_NS+"ReferenciasNota", FechaEmisionDocumentoOrigen=str(factura.factura_original_id.invoice_date), MotivoAjuste="-", NumeroAutorizacionDocumentoOrigen=factura.factura_original_id.firma_fel, NumeroDocumentoOrigen=factura.factura_original_id.numero_fel, SerieDocumentoOrigen=factura.factura_original_id.serie_fel, Version="0.0", nsmap=NSMAP_REF)
+                        else:
+                            ReferenciasNota = etree.SubElement(Complemento, CNO_NS+"ReferenciasNota", RegimenAntiguo="Antiguo", FechaEmisionDocumentoOrigen=str(factura.factura_original_id.invoice_date), MotivoAjuste="-", NumeroAutorizacionDocumentoOrigen=factura.factura_original_id.firma_fel, NumeroDocumentoOrigen=factura.factura_original_id.name.split("-")[1], SerieDocumentoOrigen=factura.factura_original_id.name.split("-")[0], Version="0.0", nsmap=NSMAP_REF)
 
-                if tipo_documento_fel in ['FACT', 'FCAM'] and factura.tipo_gasto == 'importacion':
-                    Complementos = etree.SubElement(DatosEmision, DTE_NS+"Complementos")
+                    if tipo_documento_fel in ['FCAM']:
+                        Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="FCAM", NombreComplemento="AbonosFacturaCambiaria", URIComplemento="#AbonosFacturaCambiaria")
+                        AbonosFacturaCambiaria = etree.SubElement(Complemento, CFC_NS+"AbonosFacturaCambiaria", Version="1", nsmap=NSMAP_ABONO)
+                        Abono = etree.SubElement(AbonosFacturaCambiaria, CFC_NS+"Abono")
+                        NumeroAbono = etree.SubElement(Abono, CFC_NS+"NumeroAbono")
+                        NumeroAbono.text = "1"
+                        FechaVencimiento = etree.SubElement(Abono, CFC_NS+"FechaVencimiento")
+                        FechaVencimiento.text = str(factura.date_due)
+                        MontoAbono = etree.SubElement(Abono, CFC_NS+"MontoAbono")
+                        MontoAbono.text = '{:.2f}'.format(factura.currency_id.round(gran_total))
 
-                    Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="text", NombreComplemento="text", URIComplemento="text")
-                    Exportacion = etree.SubElement(Complemento, CEX_NS+"Exportacion", Version="1", nsmap=NSMAP_EXP)
-                    NombreConsignatarioODestinatario = etree.SubElement(Exportacion, CEX_NS+"NombreConsignatarioODestinatario")
-                    NombreConsignatarioODestinatario.text = "-"
-                    DireccionConsignatarioODestinatario = etree.SubElement(Exportacion, CEX_NS+"DireccionConsignatarioODestinatario")
-                    DireccionConsignatarioODestinatario.text = "-"
-                    NombreComprador = etree.SubElement(Exportacion, CEX_NS+"NombreComprador")
-                    NombreComprador.text = "-"
-                    DireccionComprador = etree.SubElement(Exportacion, CEX_NS+"DireccionComprador")
-                    DireccionComprador.text = "-"
-                    INCOTERM = etree.SubElement(Exportacion, CEX_NS+"INCOTERM")
-                    INCOTERM.text = "FOB"
-                    NombreExportador = etree.SubElement(Exportacion, CEX_NS+"NombreExportador")
-                    NombreExportador.text = factura.company_id.name
-                    CodigoExportador = etree.SubElement(Exportacion, CEX_NS+"CodigoExportador")
-                    CodigoExportador.text = "-"
+                    if tipo_documento_fel in ['FACT', 'FCAM'] and factura.tipo_gasto == 'importacion':
+                        Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="text", NombreComplemento="text", URIComplemento="text")
+                        Exportacion = etree.SubElement(Complemento, CEX_NS+"Exportacion", Version="1", nsmap=NSMAP_EXP)
+                        NombreConsignatarioODestinatario = etree.SubElement(Exportacion, CEX_NS+"NombreConsignatarioODestinatario")
+                        NombreConsignatarioODestinatario.text = factura.consignatario_fel.name if factura.consignatario_fel else "-"
+                        DireccionConsignatarioODestinatario = etree.SubElement(Exportacion, CEX_NS+"DireccionConsignatarioODestinatario")
+                        DireccionConsignatarioODestinatario.text = factura.consignatario_fel.street or "-" if factura.consignatario_fel else "-"
+                        NombreComprador = etree.SubElement(Exportacion, CEX_NS+"NombreComprador")
+                        NombreComprador.text = factura.comprador_fel.name if factura.comprador_fel else "-"
+                        DireccionComprador = etree.SubElement(Exportacion, CEX_NS+"DireccionComprador")
+                        DireccionComprador.text = factura.comprador_fel.street or "-" if factura.comprador_fel else "-"
+                        INCOTERM = etree.SubElement(Exportacion, CEX_NS+"INCOTERM")
+                        INCOTERM.text = factura.incoterm_fel or "-"
+                        NombreExportador = etree.SubElement(Exportacion, CEX_NS+"NombreExportador")
+                        NombreExportador.text = factura.exportador_fel.name if factura.exportador_fel else "-"
+                        CodigoExportador = etree.SubElement(Exportacion, CEX_NS+"CodigoExportador")
+                        CodigoExportador.text = factura.exportador_fel.ref or "-" if factura.exportador_fel else "-"
 
-                if tipo_documento_fel in ['FESP']:
-                    Complementos = etree.SubElement(DatosEmision, DTE_NS+"Complementos")
+                    if tipo_documento_fel in ['FESP']:
+                        total_isr = abs(factura.amount_tax)
 
-                    total_isr = abs(factura.amount_tax)
+                        total_iva_retencion = 0
+                        for impuesto in factura._compute_invoice_taxes_by_group:
+                            if impuesto.amount > 0:
+                                total_iva_retencion += impuesto.amount
 
-                    total_iva_retencion = 0
-                    for impuesto in factura.tax_line_ids:
-                        if impuesto.amount > 0:
-                            total_iva_retencion += impuesto.amount
-
-                    Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="text", NombreComplemento="text", URIComplemento="text")
-                    RetencionesFacturaEspecial = etree.SubElement(Complemento, CFE_NS+"RetencionesFacturaEspecial", Version="1", nsmap=NSMAP_FE)
-                    RetencionISR = etree.SubElement(RetencionesFacturaEspecial, CFE_NS+"RetencionISR")
-                    RetencionISR.text = str(total_isr)
-                    RetencionIVA = etree.SubElement(RetencionesFacturaEspecial, CFE_NS+"RetencionIVA")
-                    RetencionIVA.text = str(total_iva_retencion)
-                    TotalMenosRetenciones = etree.SubElement(RetencionesFacturaEspecial, CFE_NS+"TotalMenosRetenciones")
-                    TotalMenosRetenciones.text = str(factura.amount_total)
+                        Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="text", NombreComplemento="text", URIComplemento="text")
+                        RetencionesFacturaEspecial = etree.SubElement(Complemento, CFE_NS+"RetencionesFacturaEspecial", Version="1", nsmap=NSMAP_FE)
+                        RetencionISR = etree.SubElement(RetencionesFacturaEspecial, CFE_NS+"RetencionISR")
+                        RetencionISR.text = str(total_isr)
+                        RetencionIVA = etree.SubElement(RetencionesFacturaEspecial, CFE_NS+"RetencionIVA")
+                        RetencionIVA.text = str(total_iva_retencion)
+                        TotalMenosRetenciones = etree.SubElement(RetencionesFacturaEspecial, CFE_NS+"TotalMenosRetenciones")
+                        TotalMenosRetenciones.text = str(factura.amount_total)
 
                 xml_sin_firma = etree.tostring(GTDocumento, encoding="UTF-8").decode("utf-8")
+                logging.warn(xml_sin_firma)
 
                 # signature = xmlsig.template.create(
                 #     xmlsig.constants.TransformInclC14N,
@@ -300,15 +301,19 @@ class AccountInvoice(models.Model):
 
                 # xml_con_firma = etree.tostring(GTDocumento, encoding="utf-8").decode("utf-8")
 
-                request_url = ""
+                request_url = "apiv2"
                 request_path = ""
+                request_url_firma = ""
                 if factura.company_id.pruebas_fel:
-                    request_url = "dev."
-                    request_path = "fel-dte-services/"
+                    request_url = "dev2.api"
+                    request_path = ""
+                    request_url_firma = "dev."
 
                 headers = { "Content-Type": "application/xml" }
-                data = '<?xml version="1.0" encoding="UTF-8"?><SolicitaTokenRequest><usuario>{}</usuario><apikey>{}</apikey></SolicitaTokenRequest>'.format(factura.journal_id.usuario_fel, factura.journal_id.clave_fel)
-                r = requests.post('https://'+request_url+'api.ifacere-fel.com/'+request_path+'api/solicitarToken', data=data, headers=headers)
+                data = '<?xml version="1.0" encoding="UTF-8"?><SolicitaTokenRequest><usuario>{}</usuario><apikey>{}</apikey></SolicitaTokenRequest>'.format(factura.company_id.usuario_fel, factura.company_id.clave_fel)
+                r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/solicitarToken', data=data, headers=headers)
+                logging.warn(data)
+                logging.warn(r.text)
                 resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
 
                 if len(resultadoXML.xpath("//token")) > 0:
@@ -317,7 +322,7 @@ class AccountInvoice(models.Model):
 
                     headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                     data = '<?xml version="1.0" encoding="UTF-8"?><FirmaDocumentoRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></FirmaDocumentoRequest>'.format(uuid_factura, xml_sin_firma)
-                    r = requests.post('https://'+request_url+'api.soluciones-mega.com/api/solicitaFirma', data=data.encode('utf-8'), headers=headers)
+                    r = requests.post('https://'+request_url_firma+'api.soluciones-mega.com/api/solicitaFirma', data=data.encode('utf-8'), headers=headers)
                     logging.warn(r.text)
                     resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
                     if len(resultadoXML.xpath("//xml_dte")) > 0:
@@ -326,13 +331,13 @@ class AccountInvoice(models.Model):
                         headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                         data = '<?xml version="1.0" encoding="UTF-8"?><RegistraDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></RegistraDocumentoXMLRequest>'.format(uuid_factura, xml_con_firma)
                         logging.warn(data)
-                        r = requests.post('https://'+request_url+'api.ifacere-fel.com/'+request_path+'api/registrarDocumentoXML', data=data.encode('utf-8'), headers=headers)
+                        r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/registrarDocumentoXML', data=data.encode('utf-8'), headers=headers)
                         resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
 
                         if len(resultadoXML.xpath("//listado_errores")) == 0:
                             xml_certificado = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
                             xml_certificado_root = etree.XML(bytes(xml_certificado, encoding='utf-8'))
-                            numero_autorizacion = xml_certificado_root.find(".//{http://www.sat.gob.gt/dte/fel/0.1.0}NumeroAutorizacion")
+                            numero_autorizacion = xml_certificado_root.find(".//{http://www.sat.gob.gt/dte/fel/0.2.0}NumeroAutorizacion")
 
                             factura.firma_fel = numero_autorizacion.text
                             factura.name = numero_autorizacion.get("Serie")+"-"+numero_autorizacion.get("Numero")
@@ -341,7 +346,7 @@ class AccountInvoice(models.Model):
 
                             headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                             data = '<?xml version="1.0" encoding="UTF-8"?><RetornaPDFRequest><uuid>{}</uuid></RetornaPDFRequest>'.format(factura.firma_fel)
-                            r = requests.post('https://'+request_url+'api.ifacere-fel.com/'+request_path+'api/retornarPDF', data=data, headers=headers)
+                            r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/retornarPDF', data=data, headers=headers)
                             resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
                             if len(resultadoXML.xpath("//listado_errores")) == 0:
                                 pdf = resultadoXML.xpath("//pdf")[0].text
@@ -353,19 +358,122 @@ class AccountInvoice(models.Model):
                 else:
                     raise UserError(r.text)
 
-        return super(AccountInvoice,self).invoice_validate()
+        return super(AccountMove,self).post()
+        
+    def button_cancel(self):
+        result = super(AccountMove, self).button_cancel()
 
+        NSMAP = {
+            "ds": "http://www.w3.org/2000/09/xmldsig#",
+            "dte": "http://www.sat.gob.gt/dte/fel/0.2.0",
+        }
+
+        DTE_NS = "{http://www.sat.gob.gt/dte/fel/0.2.0}"
+        DS_NS = "{http://www.w3.org/2000/09/xmldsig#}"
+    
+        for factura in self:
+            if factura.journal_id.generar_fel and factura.firma_fel:
+
+                tipo_documento_fel = factura.journal_id.tipo_documento_fel
+                if tipo_documento_fel in ['FACT', 'FACM'] and factura.type == 'out_refund':
+                    tipo_documento_fel = 'NCRE'
+
+                nit_receptor = 'CF'
+                if factura.partner_id.vat:
+                    nit_receptor = factura.partner_id.vat.replace('-','')
+                if tipo_documento_fel == "FESP" and factura.partner_id.cui:
+                    nit_receptor = factura.partner_id.cui
+
+                fecha = factura.invoice_date.strftime('%Y-%m-%d')
+                hora = fields.Datetime.context_timestamp(factura, timestamp=datetime.now()).strftime('%H:%M:%S')
+                fecha_hora = fecha+'T'+hora
+
+                fecha_hoy = fields.Date.context_today(factura, timestamp=datetime.now())
+                fecha_hora_hoy = fecha_hoy+'T'+hora
+
+                GTAnulacionDocumento = etree.Element(DTE_NS+"GTAnulacionDocumento", {}, Version="0.1", nsmap=NSMAP)
+                SAT = etree.SubElement(GTAnulacionDocumento, DTE_NS+"SAT", ClaseDocumento="dte")
+                AnulacionDTE = etree.SubElement(SAT, DTE_NS+"AnulacionDTE", ID="DatosCertificados")
+                DatosGenerales = etree.SubElement(AnulacionDTE, DTE_NS+"DatosGenerales", ID="DatosAnulacion", NumeroDocumentoAAnular=factura.firma_fel, NITEmisor=factura.company_id.vat.replace("-",""), IDReceptor=nit_receptor, FechaEmisionDocumentoAnular=fecha_hora, FechaHoraAnulacion=fecha_hora_hoy, MotivoAnulacion="Error")
+
+                xml_sin_firma = etree.tostring(GTDocumento, encoding="UTF-8").decode("utf-8")
+                logging.warn(xml_sin_firma)
+
+                request_url = "apiv2"
+                request_path = ""
+                request_url_firma = ""
+                if factura.company_id.pruebas_fel:
+                    request_url = "dev2.api"
+                    request_path = ""
+                    request_url_firma = "dev."
+
+                headers = { "Content-Type": "application/xml" }
+                data = '<?xml version="1.0" encoding="UTF-8"?><SolicitaTokenRequest><usuario>{}</usuario><apikey>{}</apikey></SolicitaTokenRequest>'.format(factura.company_id.usuario_fel, factura.company_id.clave_fel)
+                r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/solicitarToken', data=data, headers=headers)
+                resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+
+                if len(resultadoXML.xpath("//token")) > 0:
+                    token = resultadoXML.xpath("//token")[0].text
+                    uuid_factura = str(uuid.uuid5(uuid.NAMESPACE_OID, str(factura.id))).upper()
+
+                    headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
+                    data = '<?xml version="1.0" encoding="UTF-8"?><FirmaDocumentoRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></FirmaDocumentoRequest>'.format(uuid_factura, xml_sin_firma)
+                    r = requests.post('https://'+request_url_firma+'api.soluciones-mega.com/api/solicitaFirma', data=data.encode('utf-8'), headers=headers)
+                    logging.warn(r.text)
+                    resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+                    if len(resultadoXML.xpath("//xml_dte")) > 0:
+                        xml_con_firma = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
+
+                        headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
+                        data = '<?xml version="1.0" encoding="UTF-8"?><RegistraDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></RegistraDocumentoXMLRequest>'.format(uuid_factura, xml_con_firma)
+                        logging.warn(data)
+                        r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/anularDocumentoXML', data=data.encode('utf-8'), headers=headers)
+                        resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+
+                        if len(resultadoXML.xpath("//listado_errores")) == 0:
+                            xml_certificado = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
+                            xml_certificado_root = etree.XML(bytes(xml_certificado, encoding='utf-8'))
+                            numero_autorizacion = xml_certificado_root.find(".//{http://www.sat.gob.gt/dte/fel/0.2.0}NumeroAutorizacion")
+
+                            factura.firma_fel = numero_autorizacion.text
+                            factura.name = numero_autorizacion.get("Serie")+"-"+numero_autorizacion.get("Numero")
+                            factura.serie_fel = numero_autorizacion.get("Serie")
+                            factura.numero_fel = numero_autorizacion.get("Numero")
+
+                            headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
+                            data = '<?xml version="1.0" encoding="UTF-8"?><RetornaPDFRequest><uuid>{}</uuid></RetornaPDFRequest>'.format(factura.firma_fel)
+                            r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/retornarPDF', data=data, headers=headers)
+                            resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+                            if len(resultadoXML.xpath("//listado_errores")) == 0:
+                                pdf = resultadoXML.xpath("//pdf")[0].text
+                                factura.pdf_fel = pdf
+                        else:
+                            raise UserError(r.text)
+                    else:
+                        raise UserError(r.text)
+                else:
+                    raise UserError(r.text)
+                    
+        return result
+        
+    def button_draft(self):
+        for factura in self:
+            if factura.journal_id.generar_fel and factura.firma_fel:
+                raise UserError("La factura ya fue enviada, por lo que ya no puede ser modificada")
+            else:
+                return super(AccountMove, self).button_draft()
+                
 class AccountJournal(models.Model):
     _inherit = "account.journal"
 
-    usuario_fel = fields.Char('Usuario FEL', copy=False)
-    clave_fel = fields.Char('Clave FEL', copy=False)
-    codigo_establecimiento_fel = fields.Char('Codigo Establecimiento FEL', copy=False)
-    tipo_documento_fel = fields.Selection([('FACT', 'FACT'), ('FCAM', 'FCAM'), ('FPEQ', 'FPEQ'), ('FCAP', 'FCAP'), ('FESP', 'FESP'), ('NABN', 'NABN'), ('RDON', 'RDON'), ('RECI', 'RECI'), ('NDEB', 'NDEB'), ('NCRE', 'NCRE')], 'Tipo de Documento FEL', copy=False)
+    generar_fel = fields.Boolean('Generar FEL',)
+    tipo_documento_fel = fields.Selection([('FACT', 'FACT'), ('FCAM', 'FCAM'), ('FPEQ', 'FPEQ'), ('FCAP', 'FCAP'), ('FESP', 'FESP'), ('NABN', 'NABN'), ('RDON', 'RDON'), ('RECI', 'RECI'), ('NDEB', 'NDEB'), ('NCRE', 'NCRE')], 'Tipo de Documento FEL',)
 
 class ResCompany(models.Model):
     _inherit = "res.company"
 
+    usuario_fel = fields.Char('Usuario FEL')
+    clave_fel = fields.Char('Clave FEL')
     frases_fel = fields.Text('Frases FEL')
     adenda_fel = fields.Text('Adenda FEL')
     pruebas_fel = fields.Boolean('Modo de Pruebas FEL')

@@ -4,11 +4,11 @@
 
         <record model="ir.ui.view" id="invoice_form_fel_megaprint">
             <field name="name">account.invoice.form.fel_megaprint</field>
-            <field name="model">account.invoice</field>
-            <field name="inherit_id" ref="account.invoice_form"/>
+            <field name="model">account.move</field>
+            <field name="inherit_id" ref="l10n_gt_extra.l10n_gt_view_move_form"/>
             <field name="arch" type="xml">
                 <data>
-                    <field name="comment" position="before">
+                    <field name="narration" position="before">
                         <group>
                             <group>
                                 <field name="firma_fel"/>
@@ -32,10 +32,8 @@
             <field name="inherit_id" ref="account.view_account_journal_form"/>
             <field name="arch" type="xml">
                 <data>
-                    <field name="group_invoice_lines" position="after">
-                        <field name="usuario_fel"/>
-                        <field name="clave_fel"/>
-                        <field name="codigo_establecimiento_fel"/>
+                    <field name="currency_id" position="after">
+                        <field name="generar_fel"/>
                         <field name="tipo_documento_fel"/>
                     </field>
                 </data>
@@ -52,6 +50,8 @@
                         <page string="FEL Megaprint">
                             <group string="megaprint">
                                 <group>
+                                    <field name="usuario_fel"/>
+                                    <field name="clave_fel"/>
                                     <field name="frases_fel"/>
                                     <field name="adenda_fel"/>
                                     <field name="pruebas_fel"/>
