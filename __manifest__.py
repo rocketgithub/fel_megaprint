@@ -6,8 +6,8 @@
     'category': 'Custom',
     'description': """ Integración con factura electrónica de Megaprint """,
     'author': 'Rodrigo Fernandez',
-    'website': 'http://aquih.com/',
-    'depends': ['l10n_gt_extra'],
+    'website': 'http://solucionesprisma.com/',
+    'depends': ['account'],
     'data': [
         'views/account_view.xml',
         'views/partner_view.xml',
