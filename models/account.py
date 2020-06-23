@@ -82,7 +82,7 @@ class AccountMove(models.Model):
                     moneda = "USD"
 
                 fecha = factura.invoice_date.strftime('%Y-%m-%d')
-                hora = fields.Datetime.context_timestamp(factura, timestamp=datetime.now()).strftime('%H:%M:%S')
+                hora = "00:00:00-06:00"
                 fecha_hora = fecha+'T'+hora
                 DatosGenerales = etree.SubElement(DatosEmision, DTE_NS+"DatosGenerales", CodigoMoneda=moneda, FechaHoraEmision=fecha_hora, Tipo=tipo_documento_fel)
                 if factura.tipo_gasto == 'importacion':
@@ -385,16 +385,13 @@ class AccountMove(models.Model):
                     nit_receptor = factura.partner_id.cui
 
                 fecha = factura.invoice_date.strftime('%Y-%m-%d')
-                hora = fields.Datetime.context_timestamp(factura, timestamp=datetime.now()).strftime('%H:%M:%S')
+                hora = "00:00:00-06:00"
                 fecha_hora = fecha+'T'+hora
-
-                fecha_hoy = fields.Date.context_today(factura, timestamp=datetime.now())
-                fecha_hora_hoy = fecha_hoy+'T'+hora
 
                 GTAnulacionDocumento = etree.Element(DTE_NS+"GTAnulacionDocumento", {}, Version="0.1", nsmap=NSMAP)
                 SAT = etree.SubElement(GTAnulacionDocumento, DTE_NS+"SAT")
                 AnulacionDTE = etree.SubElement(SAT, DTE_NS+"AnulacionDTE", ID="DatosCertificados")
-                DatosGenerales = etree.SubElement(AnulacionDTE, DTE_NS+"DatosGenerales", ID="DatosAnulacion", NumeroDocumentoAAnular=factura.firma_fel, NITEmisor=factura.company_id.vat.replace("-",""), IDReceptor=nit_receptor, FechaEmisionDocumentoAnular=fecha_hora, FechaHoraAnulacion=fecha_hora_hoy, MotivoAnulacion="Error")
+                DatosGenerales = etree.SubElement(AnulacionDTE, DTE_NS+"DatosGenerales", ID="DatosAnulacion", NumeroDocumentoAAnular=factura.firma_fel, NITEmisor=factura.company_id.vat.replace("-",""), IDReceptor=nit_receptor, FechaEmisionDocumentoAnular=fecha_hora, FechaHoraAnulacion=fecha_hora, MotivoAnulacion="Error")
 
                 xml_sin_firma = etree.tostring(GTDocumento, encoding="UTF-8").decode("utf-8")
                 logging.warn(xml_sin_firma)
