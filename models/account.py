@@ -392,7 +392,7 @@ class AccountMove(models.Model):
                 fecha_hora_hoy = fecha_hoy+'T'+hora
 
                 GTAnulacionDocumento = etree.Element(DTE_NS+"GTAnulacionDocumento", {}, Version="0.1", nsmap=NSMAP)
-                SAT = etree.SubElement(GTAnulacionDocumento, DTE_NS+"SAT", ClaseDocumento="dte")
+                SAT = etree.SubElement(GTAnulacionDocumento, DTE_NS+"SAT")
                 AnulacionDTE = etree.SubElement(SAT, DTE_NS+"AnulacionDTE", ID="DatosCertificados")
                 DatosGenerales = etree.SubElement(AnulacionDTE, DTE_NS+"DatosGenerales", ID="DatosAnulacion", NumeroDocumentoAAnular=factura.firma_fel, NITEmisor=factura.company_id.vat.replace("-",""), IDReceptor=nit_receptor, FechaEmisionDocumentoAnular=fecha_hora, FechaHoraAnulacion=fecha_hora_hoy, MotivoAnulacion="Error")
 
