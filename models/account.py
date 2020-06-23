@@ -24,7 +24,7 @@ class AccountMove(models.Model):
     firma_fel = fields.Char('Firma FEL', copy=False)
     serie_fel = fields.Char('Serie FEL', copy=False)
     numero_fel = fields.Char('Numero FEL', copy=False)
-    factura_original_id = fields.Many2one('account.invoice', string="Factura original FEL")
+    factura_original_id = fields.Many2one('account.move', string="Factura original FEL", domain="[('type', '=', 'out_invoice')]")
     consignatario_fel = fields.Many2one('res.partner', string="Consignatario o Destinatario FEL")
     comprador_fel = fields.Many2one('res.partner', string="Comprador FEL")
     exportador_fel = fields.Many2one('res.partner', string="Exportador FEL")
