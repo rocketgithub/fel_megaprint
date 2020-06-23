@@ -247,7 +247,7 @@ class AccountMove(models.Model):
                         total_isr = abs(factura.amount_tax)
 
                         total_iva_retencion = 0
-                        for impuesto in factura._compute_invoice_taxes_by_group:
+                        for impuesto in factura._compute_invoice_taxes_by_group():
                             if impuesto.amount > 0:
                                 total_iva_retencion += impuesto.amount
 
