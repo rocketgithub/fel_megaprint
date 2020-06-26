@@ -24,7 +24,7 @@ class AccountMove(models.Model):
     firma_fel = fields.Char('Firma FEL', copy=False)
     serie_fel = fields.Char('Serie FEL', copy=False)
     numero_fel = fields.Char('Numero FEL', copy=False)
-    factura_original_id = fields.Many2one('account.invoice', string="Factura original FEL")
+    factura_original_id = fields.Many2one('account.move', string="Factura original FEL", domain="[('type', '=', 'out_invoice')]")
     consignatario_fel = fields.Many2one('res.partner', string="Consignatario o Destinatario FEL")
     comprador_fel = fields.Many2one('res.partner', string="Comprador FEL")
     exportador_fel = fields.Many2one('res.partner', string="Exportador FEL")
@@ -82,7 +82,7 @@ class AccountMove(models.Model):
                     moneda = "USD"
 
                 fecha = factura.invoice_date.strftime('%Y-%m-%d')
-                hora = fields.Datetime.context_timestamp(factura, timestamp=datetime.now()).strftime('%H:%M:%S')
+                hora = "00:00:00-06:00"
                 fecha_hora = fecha+'T'+hora
                 DatosGenerales = etree.SubElement(DatosEmision, DTE_NS+"DatosGenerales", CodigoMoneda=moneda, FechaHoraEmision=fecha_hora, Tipo=tipo_documento_fel)
                 if factura.tipo_gasto == 'importacion':
@@ -247,9 +247,9 @@ class AccountMove(models.Model):
                         total_isr = abs(factura.amount_tax)
 
                         total_iva_retencion = 0
-                        for impuesto in factura._compute_invoice_taxes_by_group:
-                            if impuesto.amount > 0:
-                                total_iva_retencion += impuesto.amount
+                        for impuesto in factura.amount_by_group:
+                            if impuesto[1] > 0:
+                                total_iva_retencion += impuesto[1]
 
                         Complemento = etree.SubElement(Complementos, DTE_NS+"Complemento", IDComplemento="text", NombreComplemento="text", URIComplemento="text")
                         RetencionesFacturaEspecial = etree.SubElement(Complemento, CFE_NS+"RetencionesFacturaEspecial", Version="1", nsmap=NSMAP_FE)
@@ -385,11 +385,8 @@ class AccountMove(models.Model):
                     nit_receptor = factura.partner_id.cui
 
                 fecha = factura.invoice_date.strftime('%Y-%m-%d')
-                hora = fields.Datetime.context_timestamp(factura, timestamp=datetime.now()).strftime('%H:%M:%S')
+                hora = "00:00:00-06:00"
                 fecha_hora = fecha+'T'+hora
-
-                fecha_hoy = fields.Date.context_today(factura, timestamp=datetime.now())
-                fecha_hora_hoy = fecha_hoy+'T'+hora
 
                 GTAnulacionDocumento = etree.Element(DTE_NS+"GTAnulacionDocumento", {}, Version="0.1", nsmap=NSMAP)
                 SAT = etree.SubElement(GTAnulacionDocumento, DTE_NS+"SAT")
