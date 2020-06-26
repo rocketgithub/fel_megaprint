@@ -452,13 +452,6 @@ class AccountMove(models.Model):
                     raise UserError(r.text)
                     
         return result
-        
-    def button_draft(self):
-        for factura in self:
-            if factura.journal_id.generar_fel and factura.firma_fel:
-                raise UserError("La factura ya fue enviada, por lo que ya no puede ser modificada")
-            else:
-                return super(AccountMove, self).button_draft()
                 
 class AccountJournal(models.Model):
     _inherit = "account.journal"
