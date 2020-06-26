@@ -365,10 +365,10 @@ class AccountMove(models.Model):
 
         NSMAP = {
             "ds": "http://www.w3.org/2000/09/xmldsig#",
-            "dte": "http://www.sat.gob.gt/dte/fel/0.2.0",
+            "dte": "http://www.sat.gob.gt/dte/fel/0.1.0",
         }
 
-        DTE_NS = "{http://www.sat.gob.gt/dte/fel/0.2.0}"
+        DTE_NS = "{http://www.sat.gob.gt/dte/fel/0.1.0}"
         DS_NS = "{http://www.w3.org/2000/09/xmldsig#}"
     
         for factura in self:
@@ -422,29 +422,12 @@ class AccountMove(models.Model):
                         xml_con_firma = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
 
                         headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
-                        data = '<?xml version="1.0" encoding="UTF-8"?><RegistraDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></RegistraDocumentoXMLRequest>'.format(uuid_factura, xml_con_firma)
+                        data = '<?xml version="1.0" encoding="UTF-8"?><?><AnulaDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></?><AnulaDocumentoXMLRequest>'.format(uuid_factura, xml_con_firma)
                         logging.warn(data)
                         r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/anularDocumentoXML', data=data.encode('utf-8'), headers=headers)
                         resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
 
-                        if len(resultadoXML.xpath("//listado_errores")) == 0:
-                            xml_certificado = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
-                            xml_certificado_root = etree.XML(bytes(xml_certificado, encoding='utf-8'))
-                            numero_autorizacion = xml_certificado_root.find(".//{http://www.sat.gob.gt/dte/fel/0.2.0}NumeroAutorizacion")
-
-                            factura.firma_fel = numero_autorizacion.text
-                            factura.name = numero_autorizacion.get("Serie")+"-"+numero_autorizacion.get("Numero")
-                            factura.serie_fel = numero_autorizacion.get("Serie")
-                            factura.numero_fel = numero_autorizacion.get("Numero")
-
-                            headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
-                            data = '<?xml version="1.0" encoding="UTF-8"?><RetornaPDFRequest><uuid>{}</uuid></RetornaPDFRequest>'.format(factura.firma_fel)
-                            r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/retornarPDF', data=data, headers=headers)
-                            resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
-                            if len(resultadoXML.xpath("//listado_errores")) == 0:
-                                pdf = resultadoXML.xpath("//pdf")[0].text
-                                factura.pdf_fel = pdf
-                        else:
+                        if len(resultadoXML.xpath("//listado_errores")) > 0:
                             raise UserError(r.text)
                     else:
                         raise UserError(r.text)
