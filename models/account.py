@@ -422,7 +422,7 @@ class AccountMove(models.Model):
                         xml_con_firma = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
 
                         headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
-                        data = '<?xml version="1.0" encoding="UTF-8"?><AnulaDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte><AnulaDocumentoXMLRequest>'.format(uuid_factura, xml_con_firma)
+                        data = '<?xml version="1.0" encoding="UTF-8"?><AnulaDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></AnulaDocumentoXMLRequest>'.format(uuid_factura, xml_con_firma)
                         logging.warn(data)
                         r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/anularDocumentoXML', data=data.encode('utf-8'), headers=headers)
                         resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
