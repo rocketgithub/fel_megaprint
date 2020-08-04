@@ -310,7 +310,7 @@ class AccountInvoice(models.Model):
 
                 headers = { "Content-Type": "application/xml" }
                 data = '<?xml version="1.0" encoding="UTF-8"?><SolicitaTokenRequest><usuario>{}</usuario><apikey>{}</apikey></SolicitaTokenRequest>'.format(factura.journal_id.usuario_fel, factura.journal_id.clave_fel)
-                r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/solicitarToken', data=data, headers=headers)
+                r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/solicitarToken', data=data.encode('utf-8'), headers=headers)
                 resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
 
                 if len(resultadoXML.xpath("//token")) > 0:
@@ -323,7 +323,7 @@ class AccountInvoice(models.Model):
                     logging.warn(r.text)
                     resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
                     if len(resultadoXML.xpath("//xml_dte")) > 0:
-                        xml_con_firma = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
+                        xml_con_firma = resultadoXML.xpath("//xml_dte")[0].text
 
                         headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                         data = '<?xml version="1.0" encoding="UTF-8"?><RegistraDocumentoXMLRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></RegistraDocumentoXMLRequest>'.format(uuid_factura, xml_con_firma)
@@ -332,7 +332,7 @@ class AccountInvoice(models.Model):
                         resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
 
                         if len(resultadoXML.xpath("//listado_errores")) == 0:
-                            xml_certificado = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
+                            xml_certificado = resultadoXML.xpath("//xml_dte")[0].text
                             xml_certificado_root = etree.XML(bytes(xml_certificado, encoding='utf-8'))
                             numero_autorizacion = xml_certificado_root.find(".//{http://www.sat.gob.gt/dte/fel/0.2.0}NumeroAutorizacion")
 
