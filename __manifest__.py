@@ -7,7 +7,7 @@
     'description': """ Integración con factura electrónica de Megaprint """,
     'author': 'Rodrigo Fernandez',
     'website': 'http://aquih.com/',
-    'depends': ['fel_gt'],
+    'depends': ['fel_gt','mail'],
     'data': [
         'views/account_view.xml',
     ],
