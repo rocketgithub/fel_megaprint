@@ -22,7 +22,7 @@ class AccountMove(models.Model):
 
     def post(self):
         for factura in self:
-            if factura.journal_id.generar_fel:
+            if factura.journal_id.generar_fel and factura.type in ['out_invoice', 'out_refund', 'in_invoice']:
                 if factura.firma_fel:
                     raise UserError("La factura ya fue validada, por lo que no puede ser validada nuevamnte")
                 
