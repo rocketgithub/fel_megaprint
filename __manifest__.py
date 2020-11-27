@@ -7,10 +7,9 @@
     'description': """ Integración con factura electrónica de Megaprint """,
     'author': 'Rodrigo Fernandez',
     'website': 'http://solucionesprisma.com/',
-    'depends': ['account'],
+    'depends': ['fel_gt'],
     'data': [
         'views/account_view.xml',
-        'views/partner_view.xml',
     ],
     'demo': [],
     'installable': True

@@ -5,22 +5,12 @@
         <record model="ir.ui.view" id="invoice_form_fel_megaprint">
             <field name="name">account.invoice.form.fel_megaprint</field>
             <field name="model">account.invoice</field>
-            <field name="inherit_id" ref="account.invoice_form"/>
+            <field name="inherit_id" ref="fel_gt.invoice_form_fel_gt"/>
             <field name="arch" type="xml">
                 <data>
-                    <field name="comment" position="before">
-                        <group>
-                            <group>
-                                <field name="firma_fel"/>
-                                <field name="serie_fel"/>
-                                <field name="numero_fel"/>
-                            </group>
-                            <group>
-                                <field name="name_pdf_fel" invisible="1"/>
-                                <field name="pdf_fel" filename="name_pdf_fel"/>
-                                <field name="factura_original_id"/>
-                            </group>
-                        </group>
+                    <field name="resultado_xml_fel" position="after">
+                        <field name="name_pdf_fel" invisible="1"/>
+                        <field name="pdf_fel" filename="name_pdf_fel"/>
                     </field>
                 </data>
             </field>
@@ -29,14 +19,12 @@
         <record model="ir.ui.view" id="journal_form_fel_megaprint">
             <field name="name">account.journal.form.fel_megaprint</field>
             <field name="model">account.journal</field>
-            <field name="inherit_id" ref="account.view_account_journal_form"/>
+            <field name="inherit_id" ref="fel_gt.journal_form_fel_gt"/>
             <field name="arch" type="xml">
                 <data>
-                    <field name="group_invoice_lines" position="after">
+                    <field name="tipo_documento_fel" position="after">
                         <field name="usuario_fel"/>
                         <field name="clave_fel"/>
-                        <field name="codigo_establecimiento_fel"/>
-                        <field name="tipo_documento_fel"/>
                     </field>
                 </data>
             </field>
@@ -45,20 +33,12 @@
         <record id="view_company_form_fel_megaprint" model="ir.ui.view">
             <field name="name">res.company.form.fel_megaprint</field>
             <field name="model">res.company</field>
-            <field name="inherit_id" ref="base.view_company_form"/>
+            <field name="inherit_id" ref="fel_gt.view_company_form_fel_gt"/>
             <field name="arch" type="xml">
                 <data>
-                    <notebook position="inside">
-                        <page string="FEL Megaprint">
-                            <group string="megaprint">
-                                <group>
-                                    <field name="frases_fel"/>
-                                    <field name="adenda_fel"/>
-                                    <field name="pruebas_fel"/>
-                                </group>
-                            </group>
-                        </page>
-                    </notebook>
+                    <field name="frases_fel" position="after">
+                        <field name="pruebas_fel"/>
+                    </field>
                 </data>
             </field>
         </record>
