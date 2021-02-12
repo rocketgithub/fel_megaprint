@@ -36,13 +36,16 @@ class AccountInvoice(models.Model):
 
                     request_url = "apiv2"
                     request_path = ""
+                    request_url_firma = ""
                     if factura.company_id.pruebas_fel:
                         request_url = "dev2.api"
                         request_path = ""
+                        request_url_firma = "dev."
 
                     headers = { "Content-Type": "application/xml" }
                     data = '<?xml version="1.0" encoding="UTF-8"?><SolicitaTokenRequest><usuario>{}</usuario><apikey>{}</apikey></SolicitaTokenRequest>'.format(factura.journal_id.usuario_fel, factura.journal_id.clave_fel)
                     r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/solicitarToken', data=data.encode('utf-8'), headers=headers)
+                    logging.warn(r.text)
                     resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
 
                     if len(resultadoXML.xpath("//token")) > 0:
@@ -50,8 +53,10 @@ class AccountInvoice(models.Model):
                         uuid_factura = str(uuid.uuid5(uuid.NAMESPACE_OID, str(factura.id))).upper()
 
                         headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
+                        logging.warn(headers)
                         data = '<?xml version="1.0" encoding="UTF-8"?><FirmaDocumentoRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></FirmaDocumentoRequest>'.format(uuid_factura, xml_sin_firma)
-                        r = requests.post('https://api.soluciones-mega.com/api/solicitaFirma', data=data.encode('utf-8'), headers=headers)
+                        logging.warn(data)
+                        r = requests.post('https://'+request_url_firma+'api.soluciones-mega.com/api/solicitaFirma', data=data.encode('utf-8'), headers=headers)
                         logging.warn(r.text)
                         resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
                         if len(resultadoXML.xpath("//xml_dte")) > 0:
