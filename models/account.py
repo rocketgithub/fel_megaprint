@@ -78,7 +78,6 @@ class AccountMove(models.Model):
                             numero_autorizacion = xml_certificado_root.find(".//{http://www.sat.gob.gt/dte/fel/0.2.0}NumeroAutorizacion")
 
                             factura.firma_fel = numero_autorizacion.text
-                            factura.name = numero_autorizacion.get("Serie")+"-"+numero_autorizacion.get("Numero")
                             factura.serie_fel = numero_autorizacion.get("Serie")
                             factura.numero_fel = numero_autorizacion.get("Numero")
 
