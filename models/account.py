@@ -84,6 +84,7 @@ class AccountMove(models.Model):
                             factura.documento_xml_fel = xmls_base64
                             factura.resultado_xml_fel = base64.b64encode(bytes(xml_certificado, encoding='utf-8'))
                             factura.certificador_fel = "megaprint"
+                            factura.name = numero_autorizacion.get("Serie")+"-"+numero_autorizacion.get("Numero")
 
                             headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                             data = '<?xml version="1.0" encoding="UTF-8"?><RetornaPDFRequest><uuid>{}</uuid></RetornaPDFRequest>'.format(factura.firma_fel)
