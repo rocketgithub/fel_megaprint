@@ -65,6 +65,7 @@ class AccountMove(models.Model):
                     r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/verificarDocumento', data=data.encode('utf-8'), headers=headers)
                     logging.warning(r.text)
                     resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+                    return False
 
                     if len(resultadoXML.xpath("//listado_documentos")) > 0:
                         headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
