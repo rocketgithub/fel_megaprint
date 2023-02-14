@@ -110,7 +110,7 @@ class AccountMove(models.Model):
                             return False
                             
                     else:
-                        factura.error_certificador("La factura ya fue validada, por lo que no puede ser validada nuevamnte: ".format(r.text))
+                        factura.error_certificador("La factura ya fue validada, por lo que no puede ser validada nuevamente: ".format(r.text))
                         return False
                         
                 else:
