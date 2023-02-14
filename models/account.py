@@ -61,12 +61,12 @@ class AccountMove(models.Model):
 
                     headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                     data = '<?xml version="1.0" encoding="UTF-8"?><VerificaDocumentoRequest id="{}"></VerificaDocumentoRequest>'.format(uuid_factura)
-                    logging.warning(xml_sin_firma)
+                    logging.warning(data)
                     r = requests.post('https://'+request_url+'.ifacere-fel.com/'+request_path+'api/verificarDocumento', data=data.encode('utf-8'), headers=headers)
                     logging.warning(r.text)
                     resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
 
-                    if len(resultadoXML.xpath("//tipo_respuesta")) > 0 and resultadoXML.xpath("//tipo_respuesta")[0].text == "0":
+                    if len(resultadoXML.xpath("//listado_documentos")) > 0:
                         headers = { "Content-Type": "application/xml", "authorization": "Bearer "+token }
                         data = '<?xml version="1.0" encoding="UTF-8"?><FirmaDocumentoRequest id="{}"><xml_dte><![CDATA[{}]]></xml_dte></FirmaDocumentoRequest>'.format(uuid_factura, xml_sin_firma)
                         r = requests.post('https://'+request_url_firma+'api.soluciones-mega.com/api/solicitaFirma', data=data.encode('utf-8'), headers=headers)
